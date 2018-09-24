@@ -1,0 +1,411 @@
+---
+title: "DIFFERENT"
+author: "Zheng Lyu"
+date: "November 14, 2017"
+output: pdf_document
+---
+
+```{r}
+data <- read.table("C:/Users/Zheng/Desktop/PM2.5/daily.txt",header=T)
+str(data)
+attach(data)
+monthlypm2.5 <- aggregate(data$daily,list(data$month,data$year),mean)
+monthlypm2.5
+```
+
+#SARIMA 17 first 6 M
+```{r}
+timeseries <- ts(monthlypm2.5$x[1:49],start=c(2012,12),frequency=12)
+plot(timeseries)
+dx <- diff(timeseries)
+plot(dx)
+ddx <- diff(dx,12)
+plot(ddx)
+acf(ddx,lag=40)
+pacf(ddx,lag=40)
+fit <- sarima(timeseries,p=0,d=1,q=2,P=1,D=1,Q=0,S=12)#aic296.17
+fit$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,0,1,2,1,1,0,12)
+forecast$pred
+auto.arima(timeseries,stepwise = F, approximation = F, max.D=2)#aic 389.42
+auto.arima(timeseries,stepwise = F, approximation = F)
+fit <- sarima(timeseries,p=0,d=1,q=2,P=1,D=0,Q=0,S=12)
+fit$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,0,1,2,1,0,0,12)
+forecast$pred
+data <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+plot(data)
+lines(tail(data,6))
+```
+
+#SARIMA for next 6 month
+```{r}
+timeseries <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+plot(timeseries)
+dx <- diff(timeseries)
+plot(dx)
+ddx <- diff(dx,12)
+plot(ddx)
+acf(ddx,lag=40)#Q=1,q=0
+pacf(ddx,lag=40)#P=0,p=0
+fit1 <- sarima(timeseries,p=1,d=1,q=1,P=0,D=1,Q=0,S=12)#352.32
+fit1
+fit1$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,1,1,1,0,1,0,12)
+forecast$pred
+auto.arima(timeseries,stepwise = F, approximation = F)#433.09
+fit1$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,0,1,2,1,0,0,12)
+forecast$pred
+```
+
+#HW 2017 fist 6
+```{r}
+timeseries <- ts(monthlypm2.5$x[1:49],start=c(2012,12),frequency=12)
+datacomponents1 <- decompose(timeseries)
+plot(datacomponents1)
+datacomponents2 <- decompose(timeseries,type="multiplicative")#almost same
+plot(datacomponents2)
+hwtime <- HoltWinters(timeseries)
+hwtime#Smoothing parameters:
+ #alpha: 0.05082891
+ #beta : 0.1004673
+ #gamma: 0.426933
+#fit <- ets(timeseries,model="AAA")
+#fit
+#accuracy(fit)
+pred <- predict(hwtime,n.ahead=6)
+pred
+pred <- ts(pred$mean,start=c(2017,1),frequency=12)
+plot(timeseries,xlim=c(2012,2018),ylim=c(0,100))
+lines(pred,col=2)
+```
+
+###########
+```{r}
+etst <- ets(timeseries)
+etst
+pred <- predict(etst,h=6)
+pred
+str(pred)
+pred <- ts(pred,start=c(2017,1),frequency=12)
+plot(timeseries,xlim=c(2012,2018),ylim=c(0,100))
+lines(pred,col=2)
+```
+
+
+
+#HW forecast next 6
+```{r}
+timeseries <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+datacomponents1 <- decompose(timeseries)
+plot(datacomponents1)
+datacomponents2 <- decompose(timeseries,type="multiplicative")#almost same
+plot(datacomponents2)
+hwtime <- HoltWinters(timeseries)
+hwtime#Smoothing parameters:
+# alpha: 0.09729686
+# beta : 0
+# gamma: 0.4693897
+pred <- predict(hwtime,n.ahead=6)
+pred
+pred <- ts(pred,start=c(2017,7),frequency=12)
+plot(timeseries,xlim=c(2012,2018),ylim=c(0,100))
+lines(pred,col=2)
+```
+
+#ARIMA 2017 first 6
+```{r}
+timeseries <- ts(monthlypm2.5$x[1:49],start=c(2012,12),frequency=12)
+datacomponents <- decompose(timeseries)
+dataseasonallyadjusted <- timeseries - datacomponents$seasonal
+newdata <- diff(dataseasonallyadjusted)
+plot.ts(newdata)
+acf(newdata)
+pacf(newdata)
+auto.arima(dataseasonallyadjusted, seasonal=F)
+newdataarima1 <- Arima(dataseasonallyadjusted, order=c(0,1,0))#372.13
+newdataarima2 <- Arima(dataseasonallyadjusted, order=c(1,1,1))#by hand 362.61
+newdataarima1
+newdataarima2
+library("forecast")
+newdatapredict1 <- forecast(newdataarima1,h=6)
+newdatapredict1
+plot(forecast(newdataarima1,h=6))
+newdatapredict2 <- forecast(newdataarima2,h=6)
+newdatapredict2
+plot(forecast(newdataarima2,h=6))
+predict <- data.frame(newdatapredict2$mean)
+seasonal16 <- data.frame(datacomponents$seasonal[2:7])
+forecast <- ts(predict+seasonal16,start=c(2017,1),frequency=12)
+plot(timeseries,xlim=c(2013,2018))
+lines(forecast,col=2)
+```
+
+#ARIMA next 6
+```{r}
+timeseries <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+datacomponents <- decompose(timeseries)
+dataseasonallyadjusted <- timeseries - datacomponents$seasonal
+newdata <- diff(dataseasonallyadjusted)
+plot.ts(newdata)
+acf(newdata)
+pacf(newdata)
+auto.arima(dataseasonallyadjusted)
+newdataarima1 <- Arima(dataseasonallyadjusted, order=c(0,1,0))
+newdataarima2 <- Arima(dataseasonallyadjusted, order=c(0,1,2))#no seasonal argu
+newdataarima1#411.45
+newdataarima2#398.5
+library("forecast")
+newdatapredict1 <- forecast(newdataarima1,h=6)
+newdatapredict1
+plot(forecast(newdataarima1,h=6))
+newdatapredict2 <- forecast(newdataarima2,h=6)
+newdatapredict2
+plot(forecast(newdataarima2,h=6))
+predict <- data.frame(newdatapredict2$mean)
+seasonal712 <- data.frame(datacomponents$seasonal[8:13])
+forecast <- ts(predict+seasonal712,start=c(2017,7),frequency=12)
+forecast
+plot(timeseries,xlim=c(2013,2018))
+lines(forecast,col=2)
+```
+
+#ARIMA Monthly residual
+```{r}
+
+#1.
+acf(newdatapredict2$residuals, lag.max=10)
+Box.test(newdatapredict2$residuals, lag=10, type="Ljung-Box")
+#Since the correlogram shows that none of the sample autocorrelations for lags 1-53 exceed the significance bounds, and the p-value for the Ljung-Box test is 0.85, we can conclude that there is very little evidence for non-zero autocorrelations in the forecast errors at lags 1-53.
+#2.
+plot.ts(newdatapredict2$residuals)
+plotForecastErrors <- function(forecasterrors)
+  {
+     # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins,main="Histogram of forecast errors")
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+  }
+plotForecastErrors(newdatapredict2$residuals)
+```
+
+
+
+
+
+
+
+
+
+
+#daily last 30 days as test
+```{r}
+mydata <- read.table("C:/Users/Zheng/Desktop/PM2.5/daily.txt", header = T)
+str(mydata)#1673
+test <- tail(mydata$daily,30)
+train <- head(mydata$daily,1643)
+timeseries <- ts(mydata$daily,start=c(2012,12,1),frequency=365.25)
+plot.ts(timeseries,xlab = "y", ylab= "Daily PM2.5", main= "Plot of Daily PM2.5")
+```
+#ARIMA 1
+```{r}
+timeseries <- ts(train,start=c(2012,12,1),frequency=365.25)
+datacomponents <- decompose(timeseries)
+dataseasonallyadjusted <- timeseries - datacomponents$seasonal
+newdata <- diff(dataseasonallyadjusted)
+plot.ts(newdata)
+acf(newdata)
+pacf(newdata)
+auto.arima(dataseasonallyadjusted)#2,1,2
+newdataarima1 <- Arima(dataseasonallyadjusted, order=c(2,1,2))
+newdataarima2 <- Arima(dataseasonallyadjusted, order=c(5,1,2))#by hand
+newdataarima1#13943.32
+newdataarima2#13932.96
+library("forecast")
+newdatapredict1 <- forecast(newdataarima1,h=30)
+newdatapredict1
+plot(forecast(newdataarima1,h=30))
+newdatapredict2 <- forecast(newdataarima2,h=30)
+newdatapredict2
+plot(forecast(newdataarima2,h=30))
+predict1 <- data.frame(newdatapredict1$mean)
+seasonal6 <- data.frame(datacomponents$seasonal[1279:1308])
+forecast1 <- ts(predict1+seasonal6,start=c(2017,6,1),frequency=365.25)
+write.csv(forecast1,"arima212june.csv")
+forecast1 <- data.frame(forecast1)
+forecast1
+plot(forecast1$newdatapredict1.mean,ylim=c(0,100),ylab="predict of june")
+predict2 <- data.frame(newdatapredict2$mean)
+forecast2 <- ts(predict2+seasonal6,start=c(2017,6,1),frequency=365.25)
+forecast2
+write.csv(forecast2,"arima512june.csv")
+forecast2 <- data.frame(forecast2)
+forecast2
+plot(forecast2$newdatapredict2.mean,ylim=c(0,100),ylab="predict of june")
+write.csv(test,"testjune.csv")
+plot(test,main="real data of June",ylim=c(0,100))
+```
+
+#ARIMA 2
+```{r}
+timeseries <- ts(mydata$daily,start=c(2012,12,1),frequency=365.25)
+datacomponents <- decompose(timeseries)
+dataseasonallyadjusted <- timeseries - datacomponents$seasonal
+newdata <- diff(dataseasonallyadjusted)
+plot.ts(newdata)
+acf(newdata)
+pacf(newdata)
+auto.arima(dataseasonallyadjusted)#4,1,4
+newdataarima1 <- Arima(dataseasonallyadjusted, order=c(4,1,4))
+newdataarima2 <- Arima(dataseasonallyadjusted, order=c(4,1,2))#by hand
+newdataarima1#14206.43
+newdataarima2#14195.16
+library("forecast")
+newdatapredict1 <- forecast(newdataarima1,h=31)
+newdatapredict1
+plot(forecast(newdataarima1,h=31))
+newdatapredict2 <- forecast(newdataarima2,h=31)
+newdatapredict2
+plot(forecast(newdataarima2,h=31))
+predict1 <- data.frame(newdatapredict1$mean)
+seasonal7 <- data.frame(datacomponents$seasonal[1309:1339])
+forecast1 <- ts(predict1+seasonal7,start=c(2017,7,1),frequency=365.25)
+write.csv(forecast1,"arima414July.csv")
+forecast1 <- data.frame(forecast1)
+forecast1
+plot(forecast1$newdatapredict1.mean,ylim=c(0,100),ylab="predict of July")
+mean(forecast1$newdatapredict1.mean)#17.68
+predict2 <- data.frame(newdatapredict2$mean)
+forecast2 <- ts(predict2+seasonal7,start=c(2017,7,1),frequency=365.25)
+forecast2
+write.csv(forecast2,"arima412July.csv")
+forecast2 <- data.frame(forecast2)
+forecast2
+plot(forecast2$newdatapredict2.mean,ylim=c(0,100),ylab="predict of July")
+mean(forecast1$newdatapredict1.mean)#17.68
+```
+
+#ARIMA daily residual test
+```{r}
+#1.
+acf(newdatapredict2$residuals, lag.max=300)
+Box.test(newdatapredict2$residuals, lag=300, type="Ljung-Box")
+#Since the correlogram shows that none of the sample autocorrelations for lags 1-53 exceed the significance bounds, and the p-value for the Ljung-Box test is 0.85, we can conclude that there is very little evidence for non-zero autocorrelations in the forecast errors at lags 1-53.
+#2.
+plot.ts(newdatapredict2$residuals)
+plotForecastErrors <- function(forecasterrors)
+  {
+     # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins,main="Histogram of forecast errors")
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+  }
+plotForecastErrors(newdatapredict2$residuals)
+```
+
+
+
+
+
+
+
+
+
+
+DO NOT WORK
+
+
+#SARIMA first 30
+```{r}
+timeseries <- ts(train,start=c(2012,12,1),frequency=365.25)
+plot(timeseries)
+dx <- diff(timeseries)
+plot(dx)
+ddx <- diff(dx,365)
+plot(ddx)
+acf(ddx,lag=1100)#Q=1
+acf(ddx,lag=40)#q=2
+pacf(ddx,lag=40)#p=4
+pacf(ddx,lag=1100)P=1
+auto.arima(timeseries)#4,1,5,14188.77
+fit <- sarima(timeseries,p=4,d=1,q=2,P=4,D=1,Q=1,S=365)#aic296.17
+fit$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,0,1,2,1,1,0,12)
+forecast$pred
+auto.arima(timeseries,stepwise = F, approximation = F)#aic 389.42
+fit <- sarima(timeseries,p=0,d=1,q=2,P=1,D=0,Q=0,S=12)
+fit$ttable
+forecast <- sarima.for(timeseries,n.ahead=6,0,1,2,1,0,0,12)
+forecast$pred
+data <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+plot(data)
+lines(tail(data,6))
+
+fit1 <- auto.arima(timeseries, d=1, D=NA, stationary=FALSE, + seasonal=TRUE,ic="aic",trace=TRUE, + allowdrift=FALSE,allowmean=TRUE)
+```
+
+#HW first 30
+```{r}
+timeseries <- ts(train,frequency=365.25)
+datacomponents1 <- decompose(timeseries)
+plot(datacomponents1)
+datacomponents2 <- decompose(timeseries,type="multiplicative")#almost same
+plot(datacomponents2)
+hwtime <- HoltWinters(timeseries)
+hwtime#Smoothing parameters:
+ #alpha: 0.05082891
+ #beta : 0.1004673
+ #gamma: 0.426933
+pred <- predict(hwtime,n.ahead=6)
+pred
+pred <- ts(pred,start=c(2017,1),frequency=12)
+plot(timeseries,xlim=c(2012,2018),ylim=c(0,100))
+lines(pred,col=2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

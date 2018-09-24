@@ -1,0 +1,480 @@
+---
+title: "PM2.5"
+author: "Zheng Lyu"
+date: "September 8, 2017"
+output: html_document
+---
+
+```{r}
+mydata <- read.table("C:/Users/Zheng/Desktop/PM2.5/2012-2017.txt", header = T)
+str(mydata)
+attach(mydata)
+```
+
+
+#variable type
+```{r}
+str(mydata)
+mydata$month <- as.character(month)
+mydata$roadturnover <- as.numeric(roadturnover)
+mydata$passengerturnover <- as.numeric(passengerturnover)
+mydata$pm2.5 <- as.numeric(pm2.5)
+str(mydata)
+```
+#measure of variance
+```{r}
+mydata$month <- as.numeric(mydata[,1])
+round(var(mydata),3)
+diag(round(cov(mydata),3))
+sapply(mydata,sd)
+```
+
+#correlation.
+#roadfreight,roadturnover has high correlation betweeen each other,0.98, passengervoindustrial, electricity has high correlation 0.82,industrial and petrochemical has high correlation 0.79.
+###At the same time, we see that electricity  industrial and roadfreight have moderate negtive correlation with pm2.5.(respectivelly, -0.63, -0.47,-0.32)
+```{r}
+cor(mydata)
+data <- data.frame(lapply(mydata, as.numeric))
+data2 <- cor(data, method = "pearson")
+library(corrplot)
+corrplot(data2, method = "number", type = "upper", tl.col = "black", tl.srt = 45)
+#delete variables
+mydata <- mydata[,-c(6,8)]
+str(mydata)
+```
+
+#normality
+```{r}
+names <- c("month","industrial","motor","petrochemical","roadfreight","roadturnover","passengervolume","passengerturnover","electricity","tempreture","rainfall","humidity","windspeed","sealevel","pm2.5")
+#histogram
+for(i in 2 : ncol(mydata)){
+  hist(mydata[,i],main=paste("Histogram of", i),xlab = i)
+}
+#Normal QQ plot
+par(mfrow=c(4,4))
+for(i in 2:ncol(mydata)){
+  qqnorm(mydata[,i],main=c("Q-Q Plot of",names[i]))
+  qqline(mydata[,i])
+}
+#shapiro test
+for(i in 2 : ncol(mydata)){
+  print(i)
+  print(shapiro.test(mydata[,i]))
+}
+#transformation to make variables more normal
+library(car)
+#2
+powerTransform(mydata$industrial, family="bcPower")#2.4663
+mydata$industrial <- ((mydata$industrial)^2.4663-1)/2.4663
+#4
+powerTransform(mydata$petrochemical, family="bcPower") #3.3283
+mydata$petrochemical <- ((mydata$petrochemical)^3.3283-1)/3.3283
+#7
+powerTransform(mydata$passengervolume, family="bcPower") #3.0279
+mydata$passengervolume <- ((mydata$passengervolume)^3.0279-1)/3.0279
+#8
+#powerTransform(mydata$passengerturnover, family="bcPower") #2.9876
+#mydata$passengerturnover <- ((mydata$passengerturnover)^2.9876-1)/2.9876
+#10
+powerTransform(mydata$temperature, family="bcPower") #1.3941
+mydata$temperature <- ((mydata$temperature)^1.3941-1)/1.3941
+#11
+powerTransform(mydata$rainfall, family="bcPower") #0.3289
+mydata$rainfall <- ((mydata$rainfall)^0.3289-1)/0.3289
+#13
+powerTransform(mydata$windspeed, family="bcPower") #-0.8786
+mydata$windspeed <- ((mydata$windspeed)^(-0.8786)-1)/(-0.8786)
+#14
+powerTransform(mydata$sealevel, family="bcPower") #10.0156
+mydata$sealevel <- ((mydata$sealevel)^10.0156-1)/10.0156
+#15
+powerTransform(mydata$pm2.5, family="bcPower") #0.1825
+mydata$pm2.5 <- ((mydata$pm2.5)^0.1825-1)/0.1825
+
+for(i in 2 : ncol(mydata)){
+  print(i)
+  print(shapiro.test(mydata[,i]))
+}
+names <- c("month","industrial","motor","petrochemical","roadfreight","passengervolume","electricity","tempreture","rainfall","humidity","windspeed","sealevel","pm2.5")
+par(mfrow=c(4,4))
+for(i in 2:ncol(mydata)){
+  qqnorm(mydata[,i],main=c("Q-Q Plot of",names[i]))
+  qqline(mydata[,i])
+}
+```
+
+#linear model regression
+```{r}
+library(leaps)
+library(ISLR)
+reg.best <- regsubsets(pm2.5~., data = mydata, nvmax = 10)
+plot(reg.best, scale = "adjr2", main = "Adjusted R^2")
+summary(reg.best)
+
+reg.back <- regsubsets(pm2.5~., data = mydata, nvmax = 10 , method = "forward")
+plot(reg.back, scale = "adjr2", main = "Adjusted R^2")
+summary(reg.back)
+
+reg.forward <- regsubsets(pm2.5~., data = mydata, nvmax = 10 , method = "backward")
+plot(reg.forward, scale = "adjr2", main = "Adjusted R^2")
+summary(reg.forward)
+
+model.best <- lm(pm2.5 ~ month + motor + petrochemical + electricity + temperature + rainfall + humidity + windspeed)
+summary(model.best)#0.7532
+extractAIC(model.best)#244.59
+
+model <- lm(pm2.5 ~ petrochemical + electricity + temperature + rainfall + humidity + windspeed)
+summary(model)#0.7465
+extractAIC(model)#244.41
+
+model <- lm(pm2.5 ~ petrochemical + electricity + rainfall + humidity + windspeed)
+summary(model)#0.7418
+extractAIC(model)#244.55
+
+model <- lm(pm2.5 ~ month + motor + petrochemical + roadfreight + electricity + temperature + rainfall + humidity + windspeed + sealevel)
+summary(model)#0.7587
+extractAIC(model)#244.9229
+```
+
+
+##TIME SERIES
+
+#From Timeseries, we can see that the data looks like seasonal. The trough always appears around the middle of a year and the peak is around the last and first several months of a year. In another way to say, the peak is around winter.
+```{r}
+mydata <- read.table("C:/Users/Zheng/Desktop/PM2.5/2012-2017.txt", header = T)
+str(mydata)
+attach(mydata)
+timeseries <- ts(pm2.5, frequency=12, start=c(2012,12))
+timeseries
+#########
+library(grDevices)
+background <- rgb(250,250,250,max=255)
+par(bg=background)
+par(bg="black")
+#########
+
+plot.ts(timeseries,xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5",type="b", col=3, pch=7)
+
+plot.ts(timeseries,xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5")
+x <- par("usr")
+rect(x[1],x[3],x[2],x[4], col="light blue")
+lines(timeseries,type="b", col=2, pch=7)
+
+plot.ts(timeseries,xlim=c(2012.12,2017.8),xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5",type="b")
+##############
+plot(timeseries,xlim=c(2012.12,2017.8),xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5",type="b")
+library(ggplot2)
+ggplot(data = mydata, aes(x=month, y =pm2.5)) + 
+  geom_point()+ #draw points
+  geom_smooth(method=lm)
+###############
+```
+
+
+###color
+```{r}
+cl=colors()
+length(cl)
+cl[1:10]
+x <- runif(10000,-250,250)
+hist(x, breaks=seq(-250,250,5), col=cl[1:100])
+
+#rainbow(),heat.colors(),terrain.colors(),topo.colors(),cm.colors()
+hist(x, breaks=seq(-250,250,5), col=rainbow(100))
+hist(x, breaks=seq(-250,250,5), col=heat.colors(100))
+####
+par(bg="cornsilk")
+plot.ts(timeseries,type="b", col=6, pch=1,xlab="Month",ylab="PM2.5", main= "Plot of PM2.5", col.main=6,col.axis=6)
+
+x <- par("usr")
+rect(x[1],x[3],x[2],x[4], col="cornsilk")
+lines(timeseries,type="b", col=5, pch=7)
+title(xlab="Month",ylab="PM2.5", col.lab=6)
+```
+
+
+#Check seasonal. 
+```{r}
+timeseriescomponents <- decompose(timeseries)
+timeseriescomponents
+#The estimated seasonal factors are given for the months January-December, and are the same for each year. The largest seasonal factors is for Jan, about 19.84. Also, Dec, Feb are also relatively high.(14.17,7.23,respectively), and the lowest seasonal factors is for July (about -20.37),and June and Aug are relatively low.(-11.87, -10.65 respectively). This indicates that PM2.5 has a peak around winter and a trough around summer each year.
+round(timeseriescomponents$seasonal,2)
+
+#
+#####CI boxplot
+peak <- c(timeseries[1:3],timeseries[13:15], timeseries[25:27], timeseries[37:39], timeseries[49:51])
+#Confidential interval (49.33,67.65)
+t.test(peak)
+boxplot(peak,main="peak")
+peak
+trough <- c(timeseries[7:9], timeseries[19:21], timeseries[31:33], timeseries[43:45], timeseries[55])
+#Confidential interval (21.27,36.15)
+t.test(trough)
+boxplot(trough,main="trough")
+#From the CI above, we can see that there is no intersection between two CIs, which means there is some regular partten in the data. We can say that the data is seasonal.
+boxplot(peak,trough,names=c("peak", "trough"), main="boxplots of season")
+trough
+
+####??#Plot timeseries
+plot(timeseries,ylab="PM2.5")
+points(timeseries[c(9,19)],col="green")
+points(timeseries[c(1,2,3,13,14,15,25,26,27,37,38,39,49,50,51)],col="red")
+points(timeseries[c(7,8,20,21,31,32,33,43,44,45,55)],col="blue")
+```
+
+
+#estimated trend.
+```{r}
+timeseriesseasonallyadjusted <- timeseries - timeseriescomponents$seasonal
+#The plot shows the original time series (top), the estimated trend component (second from top), the estimated seasonal component (third from top), and the estimated irregular component (bottom). We see that the estimated trend component shows decrease from about 55 in 2013 to about 32 in 2016, followed by a little bit increase from then on to about 35 in the beginning of 2017.
+plot(timeseriescomponents)
+plot(timeseriescomponents$trend,main="Estimated trend")
+timeseriescomponents$trend
+
+###CI, boxplot
+nrow(mydata)
+plot(pm2.5)
+firstpart <- head(pm2.5,28)
+#Confidential interval (46.99, 60.73)
+t.test(firstpart)
+boxplot(firstpart,main="firstpart")
+
+lastpart <- tail(pm2.5,27)
+#Confidential interval (30.65, 38.36)
+t.test(lastpart)
+boxplot(lastpart,main="lastpart")
+#from the CI above, we can see that the difference is statistically significant between former and later part of the data.
+boxplot(firstpart,lastpart,names=c("firstpart", "lastpart"), main="boxplots of two parts")
+```
+
+
+
+
+#subtract seasonal component
+```{r}
+datacomponents <- decompose(timeseries)
+dataseasonallyadjusted <- timeseries - datacomponents$seasonal
+plot(dataseasonallyadjusted)
+dataseasonallyadjusted
+```
+
+
+#stationary time series....newdata without season and trend
+```{r}
+newdata <- diff(dataseasonallyadjusted)
+plot.ts(newdata)
+###timeseries <- ts(newdata, frequency=12, start=c(2012,12))
+#newdata <- ts(newdata,frequency = 12,start=c(2013,1))
+#newdatacomponents <- decompose(newdata)
+#plot(newdatacomponents)
+
+newdata <- ts(newdata,  frequency=12, start=c(2013,1))
+plot.ts(newdata,ylab="adjusted data")
+abline(0,0,col="red")
+# You can see from the plot that there is roughly constant level (the mean stays constant at about 0). The random fluctuations in the time series seem to be roughly constant in size over time, so it is probably appropriate to describe the data using an additive model. Thus, we can make forecasts using simple exponential smoothing.
+```
+
+
+
+#simple exponential smoothing predictive model
+#To make forecasts using simple exponential smoothing in R, we can fit a simple exponential smoothing predictive model
+```{r}
+#use simple exponential smoothing to make forecasts for the time series
+newdataforecasts <- HoltWinters(newdata, beta=FALSE, gamma=FALSE)
+newdataforecasts
+#The output of HoltWinters() tells us that the estimated value of the alpha parameter is about 0.05. This is very close to zero, telling us that the forecasts are based on both recent and less recent observations (although somewhat more weight is placed on recent observations).
+newdataforecasts$fitted
+#plot original against forecast
+plot(newdataforecasts)
+```
+
+#forecast
+```{r}
+library("scales")
+library("forecast")
+newdataforecasts2 <- forecast(newdataforecasts,h=4)
+plot(forecast(newdataforecasts2))
+#Here the forecasts for next 4 month in 2017 are plotted as a blue dots, the 80% prediction interval as an darker shaded area, and the 95% prediction interval as a lighter shaded area.
+
+#forecast errors/residuals should be no autocorrelation
+residuals <- newdataforecasts2$residuals[-1]
+residuals
+acf(residuals, lag.max = 53)
+#  there is little evidence of non-zero autocorrelations in the in-sample forecast errors at lags 1-20.
+```
+
+
+
+
+#Arima
+```{r}
+plot.ts(newdata)
+acf(newdata, lag.max=54, main="correlogram")
+acf(newdata, lag.max=54, plot=FALSE)
+#Autocorrelation at lag 4 is -0.299 which exceeds the significance bound, but other autocorrelations do not exceed the significance bounds.
+pacf(newdata, lag.max=54,main="partial correlogram")
+pacf(newdata, lag.max=54, plot=FALSE)
+#
+
+newdata2 <- diff(newdata)
+plot.ts(newdata2)
+acf(newdata2, lag.max=54, main="correlogram")
+acf(newdata2, lag.max=54, plot=FALSE)
+#
+pacf(newdata2, lag.max=54,main="partial correlogram")
+pacf(newdata2, lag.max=54, plot=FALSE)
+
+#arima
+auto.arima(newdata)
+#ARIMA(1,0,2),AIC=399.76 BIC=407.72
+auto.arima(dataseasonallyadjusted)
+#ARIMA(1,1,2),AIC=399.76, BIC=407.72
+auto.arima(newdata2)
+#ARIMA(2,0,0)(1,0,0)[12],AIC=426 BIC=433.88
+auto.arima(pm2.5)
+#ARIMA(0,1,0), AIC=437.2, BIC=439.19
+```
+
+#forecast
+```{r}
+newdataarima <- Arima(newdata, order=c(1,0,2))
+newdataarima
+library("forecast")
+newdatapredict <- forecast(newdataarima,h=6)
+newdatapredict
+plot(forecast(newdataarima,h=4))
+#Here the forecasts for next 4 month in 2017 are plotted as a blue dots, the 80% prediction interval as an darker shaded area, and the 95% prediction interval as a lighter shaded area.
+
+###########
+dataarima <- Arima(dataseasonallyadjusted, order=c(1,1,2))
+dataarima
+library("forecast")
+datapredict <- forecast(dataarima,h=4)
+datapredict
+plot(forecast(dataarima,h=4))
+###########
+
+#Plot predictions on original plot
+predict <- c(8.76,18.05,20.89,31.93)
+predict <- ts(predict, frequency=12, start=c(2017,7))
+predict
+plot.ts(timeseries,xlim=c(2012.12,2018.1),ylim=c(10,85),xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5",type="b")
+points(predict,col="red")
+
+```
+
+
+#1.investigate whether the forecast errors/residuals of an ARIMA model are normally distributed with mean zero and constant variance
+#2.whether there are correlations between successive forecast errors.
+```{r}
+#1.
+acf(newdatapredict$residuals, lag.max=53)
+Box.test(newdatapredict$residuals, lag=53, type="Ljung-Box")
+#Since the correlogram shows that none of the sample autocorrelations for lags 1-53 exceed the significance bounds, and the p-value for the Ljung-Box test is 0.85, we can conclude that there is very little evidence for non-zero autocorrelations in the forecast errors at lags 1-53.
+#2.
+plot.ts(newdatapredict$residuals)
+plotForecastErrors <- function(forecasterrors)
+  {
+     # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins,main="Histogram of forecast errors")
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+  }
+plotForecastErrors(newdatapredict$residuals)
+#The time plot of the in-sample forecast errors shows that the variance of the forecast errors seems to be roughly constant over time (though perhaps there is slightly higher variance for the second half of the time series). The histogram of the time series shows that the forecast errors are roughly normally distributed and the mean seems to be close to zero. Therefore, it is plausible that the forecast errors are normally distributed with mean zero and constant variance.
+#Since successive forecast errors do not seem to be correlated, and the forecast errors seem to be normally distributed with mean zero and constant variance, the ARIMA(1,0,2) does seem to provide an adequate predictive model for PM2.5
+```
+
+
+#autocorrelation
+```{r}
+acf(pm2.5,plot=T,main="Autocorrelation of series PM2.5")
+acf(pm2.5,lag.max=12,plot=F)
+#or
+data <- as.ts(mydata[,15])
+ts.plot(data)
+acf(data)
+#################???????????why different??????????
+#to=t,t1=t-1,lag1
+t0 <- timeseries[-1]
+t1 <- timeseries[-44]
+head(cbind(t0,t1))
+lag1 <- cor(t0,t1)
+#lag2
+lag2 <- cor(timeseries[-(43:44)], timeseries[-(1:2)])
+#lag3
+lag3 <- cor(timeseries[-(42:44)], timeseries[-(1:3)])
+#lag4
+lag4 <- cor(timeseries[-(41:44)], timeseries[-(1:4)])
+
+cbind(lag1,lag2,lag3,lag4)
+##########################
+acf(dataseasonallyadjusted,plot=T,main="Autocorrelation of adjusted data")
+acf(dataseasonallyadjusted,lag.max=12,plot=F)
+#or
+data <- as.ts(mydata[,15])
+ts.plot(data)
+acf(data)
+
+
+```
+
+
+#Autoregressive model and fitted data
+```{r}
+#model1, slope parameter is 0.747, mean is 42.175, variance of noise is 108.8
+model1 <- arima(data, order=c(1,0,0))
+summary(model1)
+#plot real data and fitted data
+fitted <- data- residuals(model1)
+ts.plot(data,main="plot of real data and fitted data", ylab="PM2.5")
+points(fitted, type="l", col="red", lty=2)
+
+
+model1 <- arima(data, order=c(1,0,0))
+summary(model1)
+#plot real data and fitted data
+fitted <- data- residuals(model1)
+ts.plot(data,main="plot of real data and fitted data", ylab="PM2.5")
+points(fitted, type="l", col="red", lty=2)
+
+
+
+```
+
+#predict & forcast
+```{r}
+#predict, forecast
+model1 <- arima(timeseries, order=c(1,0,0))
+predict(model1, n.ahead=4)
+
+# Run to plot the Nile series plus the forecast and 95% prediction intervals
+ts.plot(timeseries,xlim=c(2013,2019),xlab = "month", ylab= "PM2.5", main= "Plot of PM2.5")
+ts.plot(data)
+AR_forecast <- predict(model1, n.ahead = 12)$pred
+AR_forecast_se <- predict(model1, n.ahead = 12)$se
+points(AR_forecast, type = "l", col = 2)
+points(AR_forecast - 2*AR_forecast_se, type = "l", col = 2, lty = 2)
+points(AR_forecast + 2*AR_forecast_se, type = "l", col = 2, lty = 2)
+```
+
+#fitness, 441.32,447.34
+```{r}
+AIC(model1)
+BIC(model1)
+```

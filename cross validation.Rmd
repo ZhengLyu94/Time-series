@@ -1,0 +1,154 @@
+---
+title: "cross validation"
+author: "Zheng Lyu"
+date: "November 29, 2017"
+output: pdf_document
+---
+
+```{r}
+data <- read.table("C:/Users/Zheng/Desktop/PM2.5/daily.txt",header=T)
+str(data)
+attach(data)
+monthlypm2.5 <- aggregate(data$daily,list(data$month,data$year),mean)
+```
+
+```{r}
+timeseries <- ts(monthlypm2.5$x,start=c(2012,12),frequency=12)
+plot(timeseries)
+```
+
+```{r}
+library("scales")
+library("forecast")
+```
+
+###ppt
+```{r}
+?window
+k <- 37 # minimum data length for fitting a model
+n <- length(timeseries)
+mae1 <- mae2 <- mae3 <- matrix(NA,n-k-1,12)
+#st <- tsp(timeseries)[1]+(k-2)/12
+
+for(i in 1:(n-k-1))
+{
+  xshort <- window(timeseries, end=st + i/12)
+  xnext <- window(timeseries, start=st + (i+1)/12, end=st + (i+12)/12)
+   fit1 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(1,1,0), period=12),
+      include.drift=TRUE, lambda=0, method="ML")
+  fcast1 <- forecast(fit1, h=12)
+  fit2 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(0,0,0), period=12),
+      include.drift=TRUE, lambda=0, method="ML")
+  fcast2 <- forecast(fit2, h=12)
+  fit3 <- ets(xshort,model="MMM")
+  fcast3 <- forecast(fit3, h=12)
+  mae1[i,1:length(xnext)] <- abs(fcast1[['mean']]-xnext)
+  mae2[i,1:length(xnext)] <- abs(fcast2[['mean']]-xnext)
+  mae3[i,1:length(xnext)] <- abs(fcast3[['mean']]-xnext)
+}
+
+plot(1:12, colMeans(mae1,na.rm=TRUE), type="l", col=2, xlab="horizon", ylab="MAE",
+     ylim=c(0,40))
+lines(1:12, colMeans(mae2,na.rm=TRUE), type="l",col=3)
+lines(1:12, colMeans(mae3,na.rm=TRUE), type="l",col=4)
+legend("topleft",legend=c("SARIMA","ARIMA","ETS"),col=2:4,lty=1)
+```
+
+
+
+```{r}
+k <- 35 # minimum data length for fitting a model
+n <- length(timeseries)
+mae1 <- mae2 <- mae3 <- mae4<- matrix(NA,n-k,12)
+st <- tsp(timeseries)[1]+(k-2)/12
+for(i in 1:(n-k))
+{
+  xshort <- window(timeseries, start=st+(i-k+1)/12, end=st+i/12)
+  #xshort <- window(timeseries, end=st + i/12)
+  xnext <- window(timeseries, start=st + (i+1)/12, end=st + (i+12)/12)
+  fit1 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(1,1,0), period=12))
+  fcast1 <- forecast(fit1, h=12)
+  fit2 <- Arima(xshort, order=c(1,1,1), seasonal=list(order=c(0,0,0), period=12))
+  fcast2 <- forecast(fit2, h=12)
+  #fit3 <- ets(xshort)
+  #fcast3 <- forecast(fit3, h=12)
+  fit4 <- HoltWinters(xshort)
+  fcast4 <- forecast(fit4, h=12)
+  mae1[i,1:length(xnext)] <- abs(fcast1[['mean']]-xnext)
+  mae2[i,1:length(xnext)] <- abs(fcast2[['mean']]-xnext)
+  #mae3[i,1:length(xnext)] <- abs(fcast3[['mean']]-xnext)
+  mae4[i,1:length(xnext)] <- abs(fcast4[['mean']]-xnext)
+}
+
+plot(1:12, colMeans(mae1,na.rm=TRUE), type="l", col=2, xlab="horizon", ylab="MAE",
+     ylim=c(0,40))
+lines(1:12, colMeans(mae2,na.rm=TRUE), type="l",col=3)
+#lines(1:12, colMeans(mae3,na.rm=TRUE), type="l",col=4)
+lines(1:12, colMeans(mae4,na.rm=TRUE), type="l",col=4)
+legend("topleft",legend=c("SARIMA","ARIMA","HoltWinters"),col=2:4,lty=1)
+
+```
+
+#auto.arima
+```{r}
+k <- 30 # minimum data length for fitting a model
+n <- length(timeseries)
+mae1 <- mae2 <- mae3 <- matrix(NA,n-k,12)
+st <- tsp(timeseries)[1]+(k-2)/12
+library("scales")
+library("forecast")
+
+for(i in 1:(n-k))
+{
+  xshort <- window(timeseries, end=st + i/12)
+  xnext <- window(timeseries, start=st + (i+1)/12, end=st + (i+12)/12)
+  fit1 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(1,1,0), period=12))
+  fcast1 <- forecast(fit1, h=12)
+  fit2 <- auto.arima(xshort, seasonal=F,lambda = 0)
+  fcast2 <- forecast(fit2, h=12)
+  fit3 <- HoltWinters(xshort)
+  fcast3 <- forecast(fit3, h=12)
+  mae1[i,1:length(xnext)] <- abs(fcast1[['mean']]-xnext)
+  mae2[i,1:length(xnext)] <- abs(fcast2[['mean']]-xnext)
+  mae3[i,1:length(xnext)] <- abs(fcast3[['mean']]-xnext)
+}
+
+plot(1:12, colMeans(mae1,na.rm=TRUE), type="l", col=2, xlab="horizon", ylab="MAE",ylim=c(0,40))
+lines(1:12, colMeans(mae2,na.rm=TRUE), type="l",col=3)
+lines(1:12, colMeans(mae3,na.rm=TRUE), type="l",col=4)
+legend("topleft",legend=c("SARIMA","ARIMA","HoltWinters"),col=2:4,lty=1)
+```
+
+
+
+#!!!!!!!!!!!!!
+```{r}
+k <- 43 # minimum data length for fitting a model
+n <- length(timeseries)
+mae1 <- mae2 <- mae3 <- matrix(NA,12,12)
+st <- tsp(timeseries)[1]+(k-1)/12
+for(i in 1:12)
+{
+  xshort <- window(timeseries, end=st + (i-1))
+  xnext <- window(timeseries, start=st + i-(11/12), end=st + i)
+  fit1 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(1,1,0), period=12),
+      include.drift=TRUE, lambda=0, method="ML")
+  fcast1 <- forecast(fit1, h=12)
+  fit2 <- Arima(xshort, order=c(0,1,2), seasonal=list(order=c(0,0,0), period=12),
+      include.drift=TRUE, lambda=0, method="ML")
+  fcast2 <- forecast(fit2, h=12)
+  fit3 <- ets(xshort,model="MMM",damped=TRUE)
+  fcast3 <- forecast(fit3, h=12)
+  mae1[i,] <- abs(fcast1[['mean']]-xnext)
+  mae2[i,] <- abs(fcast2[['mean']]-xnext)
+  mae3[i,] <- abs(fcast3[['mean']]-xnext)
+}
+plot(1:12, colMeans(mae1), type="l", col=2, xlab="horizon", ylab="MAE",
+     ylim=c(0,40))
+lines(1:12, colMeans(mae2), type="l",col=3)
+lines(1:12, colMeans(mae3), type="l",col=4)
+legend("topleft",legend=c("LM","ARIMA","ETS"),col=2:4,lty=1)
+```
+
+
+
